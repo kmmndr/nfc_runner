@@ -1,23 +1,35 @@
 package main
 
-import "os"
+import (
+	"flag"
+	"fmt"
+	"os"
+	"os/exec"
+	"os/signal"
+	"reflect"
+	"regexp"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+)
 
-// import "strings"
-import "fmt"
-import "flag"
-import "strconv"
-
-import "os/signal"
-import "syscall"
-import "time"
-
-func execCommand(serialNumber <-chan string) {
+func execCommand(serialNumber <-chan string, cmd []string) {
 	for {
 		select {
 		case msg := <-serialNumber:
-			fmt.Println("executing command with serial number: ", msg)
+			fmt.Printf("executing command %v with serial number: %v\n", cmd, msg)
+			re := regexp.MustCompile("%SERIAL")
+			args := strings.Join(cmd[1:], " ")
+			fmt.Printf("%q\n", re.FindString(args))
+			out, err := exec.Command(cmd[0], cmd[1:]...).Output()
+			if err != nil {
+				fmt.Println("error occured")
+				fmt.Printf("%s", err)
+			}
+			fmt.Printf("%s", out)
 		default:
-			fmt.Println("no activity")
+			//fmt.Println("no activity")
 		}
 		time.Sleep(time.Second * 2)
 	}
@@ -64,37 +76,18 @@ func main() {
 	//}
 
 	// program options
-	wordPtr := flag.String("word", "foo", "a string")
-	numbPtr := flag.Int("numb", 42, "an int")
-	boolPtr := flag.Bool("fork", false, "a bool")
-	var svar string
-	flag.StringVar(&svar, "svar", "bar", "a string var")
+	boolPtr := flag.Bool("verbose", false, "verbose output")
 	flag.Parse()
-	fmt.Println("word:", *wordPtr)
-	fmt.Println("numb:", *numbPtr)
-	fmt.Println("fork:", *boolPtr)
-	fmt.Println("svar:", svar)
-	fmt.Println("tail:", flag.Args())
+	fmt.Println("verbose:", *boolPtr)
+	fmt.Println("cmd:", flag.Args())
+	fmt.Println("cmd is a", reflect.TypeOf(flag.Args()))
 
 	// signals
 	fmt.Println("PID:", os.Getpid())
-
-	//sigs := make(chan os.Signal, 1)
-	//done := make(chan bool, 1)
-	//signal.Notify(sigs, syscall.SIGUSR1)
-	//go func() {
-	//	sig := <-sigs
-	//	fmt.Println()
-	//	fmt.Println(sig)
-	//	done <- true
-	//}()
-
-	//fmt.Println("awaiting signal")
-	//<-done
 	serialNumber := make(chan string, 1)
 
 	go fakeNfcEventHandler(serialNumber)
-	go execCommand(serialNumber)
+	go execCommand(serialNumber, flag.Args())
 
 	for {
 	}
