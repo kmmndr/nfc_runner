@@ -1,0 +1,5 @@
+1234;echo %SERIAL 4
+1233;echo %SERIAL 3
+#1232;echo %SERIAL 2
+1231;echo %SERIAL 1
+1230;echo %SERIAL 0
