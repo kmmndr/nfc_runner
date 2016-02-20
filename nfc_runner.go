@@ -10,13 +10,71 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/tarm/serial"
 )
 
 var verbose bool
+
+func readOlimexSerial(serialNumber chan<- string, port string) {
+	buf := make([]byte, 128)
+
+	c := &serial.Config{Name: port, Baud: 115200}
+	s, err := serial.OpenPort(c)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	/**
+	* MOD-RFID125-USBSTICK
+	* Brief command list and usage description:
+	*   i - print information
+	*   ? - print this help
+	*   b - switch to bootloader
+	*   r - wait RFID tag and print it, or timeout and print zeros
+	*   msXX - Set single read mode with XX (decimal) seconds timeout
+	*   mcFR - Set continuous read mode with frequency F (Hz) and repeat report
+	*          interval R (seconds).
+	*          Note1: F and R are single decimal digits
+	*          Note2: If F=0 then RF antenna is constantly switched ON.
+	*          Note2: If R=0 then RF tag data is reported only once.
+	*   mlE - Set led mode to disabled (E=0), or enabled (E=1)
+	* See http://www.olimex.com for complete documentation.
+	**/
+	n, err := s.Write([]byte("mc91\r\n"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = s.Read(buf)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		n, err = s.Read(buf)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		readString := string(buf[:n])
+
+		if verbose {
+			fmt.Printf("MOD-RFID125 read %q\n", readString)
+		}
+
+		re := regexp.MustCompile("\r\n-(.*)\r\n>")
+		serial := re.ReplaceAllString(readString, "$1")
+		serialNumber <- serial
+
+		time.Sleep(100 * time.Millisecond)
+	}
+}
 
 func execCommand(serial string, command string) {
 	fmt.Printf("executing command \"%v\" with serial number: \"%v\"\n", command, serial)
@@ -122,12 +180,14 @@ func Usage() {
 
 func main() {
 	// program options
-	var command string
+	var port string
 	var commandsFile string
+	var command string
 	var commands map[string]string
 	serialNumber := make(chan string, 1)
 
 	flag.Usage = Usage
+	flag.StringVar(&port, "port", "/dev/ttyACM0", "serial port connected to MOD-RFID125 listener")
 	flag.StringVar(&command, "command", "echo %SERIAL", "command to execute")
 	flag.StringVar(&commandsFile, "file", "", "commands file with lines having 'serial;command'")
 	flag.BoolVar(&verbose, "verbose", false, "verbose output")
@@ -155,6 +215,7 @@ func main() {
 	}
 
 	go fakeNfcEventHandler(serialNumber)
+	go readOlimexSerial(serialNumber, port)
 
 	if len(commandsFile) > 0 {
 		commands = readCommandsFile(commandsFile)
