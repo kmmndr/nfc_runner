@@ -21,7 +21,7 @@ import (
 
 var debug bool
 
-func readOlimexSerial(serialNumber chan<- string, port string) {
+func readOlimexSerial(serialNumber chan<- string, port string, singleRun bool) {
 	buf := make([]byte, 128)
 
 	c := &serial.Config{Name: port, Baud: 115200}
@@ -48,7 +48,11 @@ func readOlimexSerial(serialNumber chan<- string, port string) {
 	*   mlE - Set led mode to disabled (E=0), or enabled (E=1)
 	* See http://www.olimex.com for complete documentation.
 	**/
-	n, err := s.Write([]byte("mc91\r\n"))
+	mc := "mc91"
+	if singleRun {
+		mc = "mc90"
+	}
+	n, err := s.Write([]byte(mc + "\r\n"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -186,6 +190,8 @@ func main() {
 	var command string
 	var commands map[string]string
 
+	var continuous bool
+
 	serialNumber := make(chan string, 1)
 	sigs := make(chan os.Signal, 1)
 
@@ -194,6 +200,7 @@ func main() {
 	flag.StringVar(&command, "command", "echo %SERIAL", "command to execute")
 	flag.StringVar(&commandsFile, "file", "", "commands file with lines having 'serial;command'")
 	flag.BoolVar(&debug, "debug", false, "output debug messages")
+	flag.BoolVar(&continuous, "continuous", false, "exec command until detection stop")
 
 	flag.Parse()
 	if debug {
@@ -220,7 +227,7 @@ func main() {
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	go fakeNfcEventHandler(serialNumber)
-	go readOlimexSerial(serialNumber, port)
+	go readOlimexSerial(serialNumber, port, !continuous)
 
 	if len(commandsFile) > 0 {
 		commands = readCommandsFile(commandsFile)
