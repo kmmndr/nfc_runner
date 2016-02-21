@@ -19,7 +19,7 @@ import (
 	"github.com/tarm/serial"
 )
 
-var verbose bool
+var debug bool
 
 func readOlimexSerial(serialNumber chan<- string, port string) {
 	buf := make([]byte, 128)
@@ -64,7 +64,7 @@ func readOlimexSerial(serialNumber chan<- string, port string) {
 
 		readString := string(buf[:n])
 
-		if verbose {
+		if debug {
 			fmt.Printf("MOD-RFID125 read %q\n", readString)
 		}
 
@@ -94,7 +94,7 @@ func execCommandFromMap(serialNumber <-chan string, commands map[string]string) 
 		case serial := <-serialNumber:
 			execCommand(serial, commands[serial])
 		default:
-			if verbose {
+			if debug {
 				fmt.Println("no activity")
 			}
 		}
@@ -108,7 +108,7 @@ func execCommandFromString(serialNumber <-chan string, command string) {
 		case serial := <-serialNumber:
 			execCommand(serial, command)
 		default:
-			if verbose {
+			if debug {
 				fmt.Println("no activity")
 			}
 		}
@@ -143,7 +143,7 @@ func fakeNfcEventHandler(serialNumber chan<- string) {
 func readCommandsFile(commandsFile string) map[string]string {
 	commands := make(map[string]string)
 
-	if verbose {
+	if debug {
 		fmt.Println("reading file:", commandsFile)
 	}
 	file, err := os.Open(commandsFile)
@@ -164,7 +164,7 @@ func readCommandsFile(commandsFile string) map[string]string {
 			log.Fatal(err)
 		}
 
-		if verbose {
+		if debug {
 			fmt.Println(record)
 		}
 		commands[record[0]] = record[1]
@@ -193,16 +193,16 @@ func main() {
 	flag.StringVar(&port, "port", "/dev/ttyACM0", "serial port connected to MOD-RFID125 listener")
 	flag.StringVar(&command, "command", "echo %SERIAL", "command to execute")
 	flag.StringVar(&commandsFile, "file", "", "commands file with lines having 'serial;command'")
-	flag.BoolVar(&verbose, "verbose", false, "verbose output")
+	flag.BoolVar(&debug, "debug", false, "output debug messages")
 
 	flag.Parse()
-	if verbose {
+	if debug {
 		fmt.Println("unknown arguments:", flag.Args())
 	}
 
 	// ENVIRONMENT
 	os.Setenv("FOO", "1")
-	if verbose {
+	if debug {
 		fmt.Println("FOO:", os.Getenv("FOO"))
 		fmt.Println("BAR:", os.Getenv("BAR"))
 		fmt.Println()
@@ -213,7 +213,7 @@ func main() {
 	}
 
 	// signals
-	if verbose {
+	if debug {
 		fmt.Println("PID:", os.Getpid())
 	}
 
