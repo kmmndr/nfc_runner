@@ -185,7 +185,9 @@ func main() {
 	var commandsFile string
 	var command string
 	var commands map[string]string
+
 	serialNumber := make(chan string, 1)
+	sigs := make(chan os.Signal, 1)
 
 	flag.Usage = Usage
 	flag.StringVar(&port, "port", "/dev/ttyACM0", "serial port connected to MOD-RFID125 listener")
@@ -215,6 +217,8 @@ func main() {
 		fmt.Println("PID:", os.Getpid())
 	}
 
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
 	go fakeNfcEventHandler(serialNumber)
 	go readOlimexSerial(serialNumber, port)
 
@@ -226,8 +230,8 @@ func main() {
 		go execCommandFromString(serialNumber, command)
 	}
 
-	for {
-	}
+	<-sigs
+	close(serialNumber)
 
 	fmt.Println("exiting")
 }
