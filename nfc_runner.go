@@ -30,6 +30,8 @@ func readOlimexSerial(serialNumber chan<- string, port string) {
 		log.Fatal(err)
 	}
 
+	defer s.Close()
+
 	/**
 	* MOD-RFID125-USBSTICK
 	* Brief command list and usage description:
@@ -51,10 +53,8 @@ func readOlimexSerial(serialNumber chan<- string, port string) {
 		log.Fatal(err)
 	}
 
-	_, err = s.Read(buf)
-	if err != nil {
-		log.Fatal(err)
-	}
+	time.Sleep(100 * time.Millisecond)
+	s.Read(buf)
 
 	for {
 		n, err = s.Read(buf)
@@ -68,7 +68,8 @@ func readOlimexSerial(serialNumber chan<- string, port string) {
 			fmt.Printf("MOD-RFID125 read %q\n", readString)
 		}
 
-		re := regexp.MustCompile("\r\n-(.*)\r\n>")
+		re := regexp.MustCompile("^\r\n-([[:alnum:]]{10})\r\n>[[:space:][:print:]]*")
+
 		serial := re.ReplaceAllString(readString, "$1")
 		serialNumber <- serial
 
